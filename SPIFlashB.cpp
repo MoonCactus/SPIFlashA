@@ -4,7 +4,7 @@
  * For instance a 128MBit (16Mbyte) flash chip will have 65536 pages: 256*65536 = 16777216 bytes (16MKbytes)
  * This library uses the same function ones as the Moteino SPIFlash and is interned to be used for wireless programming
  * using the Moteino terminology for Anarduino
- * See http://lowpowerlab.com/blog/category/moteino/wireless-programming/ and https://github.com/LowPowerLab/WirelessProgramming 
+ * See http://lowpowerlab.com/blog/category/moteino/wireless-programming/ and https://github.com/LowPowerLab/WirelessProgramming
  * Therefore only a limited set of SPANSION programming functions are implemented to erase, read and write the Flash memory
  *
  * NOTES:
@@ -13,18 +13,19 @@
  *		1. Deep Power mode (Down/Sleep 0xB9 and Release/Wakeup 0xAB) mode is not implemented, the equivalent Moteino SPIFlash functions are therefore programmed as a NOOP
  *		   for compatibility reasons
  *		2. blockErase34K(); (0x52) command is not exactly implemented as for the WINBOND, instead it generates a 8 * blockErase4K() fore compatibility
- *		3. The chipErase(); (0x60) which in the case of the WINBOND is equivalent to a 512K Block erase is simulated by a 8 * blockErase64K(), the actual Chip Erase 
+ *		3. The chipErase(); (0x60) which in the case of the WINBOND is equivalent to a 512K Block erase is simulated by a 8 * blockErase64K(), the actual Chip Erase
  *		   which takes quite a long time (typically 45 seconds for 16 MBytes) is implemented as a new function (bulkErase()) in case of need;
- * 		4. The WINBOND Unique Identifier 8 Bytes value is replaced by a 12 last Bytes of the fisrt 16 Bytes OTP (Manufacturer One Time Program) which is obtained using 
+ * 		4. The WINBOND Unique Identifier 8 Bytes value is replaced by a 12 last Bytes of the fisrt 16 Bytes OTP (Manufacturer One Time Program) which is obtained using
  *		   the readUniqueId () command
  *			Note from the specs:
  *				The OTP 16 lowest address bytes are programmed by Spansion with a 128-bit random number. Only Spansion is able to program these bytes.
  *		5. The JEDEC identifier for the S25FL127S is 0x12018
  *			Note:
  *				1st Byte:  0x01 Manufacturer ID for Spansion
- *				2nd Byte:  0x20 (128 Mb) Device ID Most Significant Byte - Memory Interface Type *				3rd Byte:  0x18 (128 Mb) Device ID Least Significant Byte - Density 
+ *				2nd Byte:  0x20 (128 Mb) Device ID Most Significant Byte - Memory Interface Type
+ *				3rd Byte:  0x18 (128 Mb) Device ID Least Significant Byte - Density
  *		6. A new command printRDID (), is implemented to dump the Manufacturer and Device ID 320Bytes table
- *		7. A new command printStatus(), is implemented to print the status registers 1 and 2 
+ *		7. A new command printStatus(), is implemented to print the status registers 1 and 2
  *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of either the GNU General Public License version 2
@@ -73,7 +74,7 @@ boolean SPIFlashA::initialize()
   unselect();
   wakeup();
   while (busy());		// Ensure the memory is ready after power up or restart
-  
+
   if (_jedecID == 0 || readDeviceId() == _jedecID) {
     command(SPIFLASH_STATUSWRITE, true); // Write Status Register
     SPI.transfer(0);                     // Global Unprotect
@@ -265,6 +266,7 @@ void SPIFlashA::blockErase512K(long addr) {
   }
 }
 
+/*
 /// Print the STATUS register 1&2
 void SPIFlashA::printStatus()
 {
@@ -275,6 +277,7 @@ void SPIFlashA::printStatus()
   Serial.print ("Status Register 2 (Binary): "),Serial.println (SPI.transfer(0),BIN);
   unselect();
 }
+*/
 
 /// Print 320 Bytes of the Manufacturer ID and Common Flash Information table (CFI)
 void SPIFlashA::printRDID() {
@@ -287,10 +290,10 @@ void SPIFlashA::printRDID() {
      if(i>0 && i%32 ==0) Serial.println();
      if(b<0x10) Serial.print("0");
      Serial.print(b,HEX);
-     Serial.print(" ");
+     Serial.write(' ');
   }
   Serial.println();
- unselect();     
+ unselect();
 }
 
 
