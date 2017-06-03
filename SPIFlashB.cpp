@@ -10,13 +10,8 @@
  * NOTES:
  *		The Anarduino SPANSION Flash memory (S25FL127S) uses a SPI command interface that is slightly different than the one used by the
  *		Moteino WINBOND (W25X40CL).
- *		1. Deep Power mode (Down/Sleep 0xB9 and Release/Wakeup 0xAB) mode is not implemented, the equivalent Moteino SPIFlash functions are therefore programmed as a NOOP
- *		   for compatibility reasons
- *		2. blockErase34K(); (0x52) command is not exactly implemented as for the WINBOND, instead it generates a 8 * blockErase4K() fore compatibility
- *		3. The chipErase(); (0x60) which in the case of the WINBOND is equivalent to a 512K Block erase is simulated by a 8 * blockErase64K(), the actual Chip Erase
- *		   which takes quite a long time (typically 45 seconds for 16 MBytes) is implemented as a new function (bulkErase()) in case of need;
- * 		4. The WINBOND Unique Identifier 8 Bytes value is replaced by a 12 last Bytes of the fisrt 16 Bytes OTP (Manufacturer One Time Program) which is obtained using
- *		   the readUniqueId () command
+ *       bulkErase() takes quite a long time (typically 45 seconds for 16 MBytes)
+ * 		4. The WINBOND Unique Identifier 8 Bytes value is replaced by a 12 last Bytes of the fisrt 16 Bytes OTP (Manufacturer One Time Program) which is obtained using the readUniqueId () command
  *			Note from the specs:
  *				The OTP 16 lowest address bytes are programmed by Spansion with a 128-bit random number. Only Spansion is able to program these bytes.
  *		5. The JEDEC identifier for the S25FL127S is 0x12018
@@ -24,8 +19,6 @@
  *				1st Byte:  0x01 Manufacturer ID for Spansion
  *				2nd Byte:  0x20 (128 Mb) Device ID Most Significant Byte - Memory Interface Type
  *				3rd Byte:  0x18 (128 Mb) Device ID Least Significant Byte - Density
- *		6. A new command printRDID (), is implemented to dump the Manufacturer and Device ID 320Bytes table
- *		7. A new command printStatus(), is implemented to print the status registers 1 and 2
  *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of either the GNU General Public License version 2
@@ -33,9 +26,7 @@
  * published by the Free Software Foundation.
 */
 
-#include <SPIFlashA.h>
-
-byte SPIFlashA::UNIQUEID[12];
+#include <SPIFlashB.h>
 
 SPIFlashA::SPIFlashA(uint8_t slaveSelectPin, uint32_t jedecID) {
   _slaveSelectPin = slaveSelectPin;
@@ -72,7 +63,6 @@ boolean SPIFlashA::initialize()
   _SPSR = SPSR;
   pinMode(_slaveSelectPin, OUTPUT);
   unselect();
-  wakeup();
   while (busy());		// Ensure the memory is ready after power up or restart
 
   if (_jedecID == 0 || readDeviceId() == _jedecID) {
@@ -101,13 +91,8 @@ long SPIFlashA::readDeviceId()
   return jedecid;
 }
 
-/// Get the 64 bit unique identifier, stores it in UNIQUEID[8]. Only needs to be called once, ie after initialize
-/// Returns the byte pointer to the UNIQUEID byte array
-/// Read UNIQUEID like this:
-/// flash.readUniqueId(); for (byte i=0;i<12;i++) { Serial.print(flash.UNIQUEID[i], HEX); Serial.print(' '); }
-/// or like this:
-/// flash.readUniqueId(); byte* MAC = flash.readUniqueId(); for (byte i=0;i<12;i++) { Serial.print(MAC[i], HEX); Serial.print(' '); }
-byte* SPIFlashA::readUniqueId()
+/// Get the 64 bit unique identifier, stores it in provided uniqueId[8] and return a pointer to it
+byte* SPIFlashA::readUniqueId(byte uniqueId[12])
 {
   command(SPIFLASH_MACREAD);
   SPI.transfer(0);
@@ -115,9 +100,9 @@ byte* SPIFlashA::readUniqueId()
   SPI.transfer(0);
   SPI.transfer(0);
   for (byte i=0;i<12;i++)				// Change from 8 to 12 for SPANSION
-    UNIQUEID[i] = SPI.transfer(0);
+    uniqueId[i] = SPI.transfer(0);
   unselect();
-  return UNIQUEID;
+  return uniqueId;
 }
 
 /// read 1 byte from flash memory
@@ -220,17 +205,6 @@ void SPIFlashA::bulkErase() {
   unselect();
 }
 
-/// erase 512 KBytes of memory (equivalent size of a WINBOND W25X40CL Moteino memory)
-/// may take several seconds depending on size, but is non blocking
-/// so you may wait for this to complete using busy() or continue doing
-/// other things and later check if the chip is done with busy()
-/// note that any command will first wait for chip to become available using busy()
-/// so no need to do that twice
-void SPIFlashA::chipErase() {
-  blockErase512K(0);
-  }
-
-
 /// erase a 4Kbyte block
 void SPIFlashA::blockErase4K(long addr) {
   command(SPIFLASH_BLOCKERASE_4K, true); // Block Erase
@@ -238,15 +212,6 @@ void SPIFlashA::blockErase4K(long addr) {
   SPI.transfer(addr >> 8);
   SPI.transfer(addr);
   unselect();
-}
-
-/// erase a 32Kbyte block
-void SPIFlashA::blockErase32K(long addr) {
- for (int i = 0; i <8; i++)
- {
-  blockErase4K (addr);				// Erase 8*4K consecutive Bytes
-  addr = addr+4096;
-  }
 }
 
 /// erase a 64Kbyte block
@@ -257,54 +222,36 @@ void SPIFlashA::blockErase64K(long addr) {
   SPI.transfer(addr);
   unselect();
 }
-/// erase a 512Kbyte block
-void SPIFlashA::blockErase512K(long addr) {
- for (int i = 0; i <8; i++)
- {
-  blockErase64K (addr);				// Erase 8*64K consecutive Bytes
-  addr = addr+65536;
-  }
-}
 
-/*
-/// Print the STATUS register 1&2
-void SPIFlashA::printStatus()
+void SPIFlashA::circular_log(uint32_t& addr, uint8_t* payload, size_t size)
 {
-  select();
-  SPI.transfer(SPIFLASH_STATUSREAD);
-  Serial.print ("\n\rStatus Register 1 (Binary): "),Serial.println (SPI.transfer(0),BIN);
-  SPI.transfer(SPIFLASH_STATUSREAD2);
-  Serial.print ("Status Register 2 (Binary): "),Serial.println (SPI.transfer(0),BIN);
-  unselect();
-}
-*/
-
-/// Print 320 Bytes of the Manufacturer ID and Common Flash Information table (CFI)
-void SPIFlashA::printRDID() {
- long rdid ;
-  select ();
-    SPI.transfer(SPIFLASH_IDREAD);
-  for(int i=0; i<320; i++) {
-     byte b = SPI.transfer(0x00);
-     rdid += b;
-     if(i>0 && i%32 ==0) Serial.println();
-     if(b<0x10) Serial.print("0");
-     Serial.print(b,HEX);
-     Serial.write(' ');
+  // TODO: use faster FIFO writeBytes(addr,payload,length), but check block boundaries else wrap around will occur!
+  // Writing uses 50mA, see http://www.cypress.com/file/177961/download
+  /*
+    10.5.1.1 Page Programming
+    Page Programming is done by loading a Page Buffer with data to be programmed and issuing a programming
+    command to move data from the buffer to the memory array. This sets an upper limit on the amount of data
+    that can be programmed with a single programming command. Page Programming allows up to a page size
+    (either 256 or 512 bytes) to be programmed in one operation. The page size is determined by a configuration
+    bit (SR2[6]). The page is aligned on the page size address boundary. It is possible to program from one bit up
+    to a page size in each Page programming operation. It is recommended that a multiple of 16-byte length and
+    aligned Program Blocks be written. For the very best performance, programming should be done in full,
+    aligned, pages of 512 bytes aligned on 512-byte boundaries with each Page being programmed only once.
+  */
+  for(size_t n=0; n<size; ++n)
+  {
+    if((addr & 0xFFF) == 0) // entering a new 4KB sector? then we need to erase it first
+    {
+      blockErase4K(addr / 0x1000);
+      while(busy());
+    }
+    writeByte(addr, payload[n]);
+    while(busy());
+    ++addr;
+    if(addr==0x1000000) // 16MByte wrap around
+      addr= 0;
   }
-  Serial.println();
- unselect();
-}
-
-
-void SPIFlashA::sleep() {
-//  command(SPIFLASH_SLEEP);		// NOOP FOR SPANSION
-//  unselect();
-}
-
-void SPIFlashA::wakeup() {
-//  command(SPIFLASH_WAKE);			// NOOP FOR SPANSION
-//  unselect();
+  while(busy());
 }
 
 /// cleanup

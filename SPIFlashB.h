@@ -4,7 +4,7 @@
  * For instance a 128MBit (16Mbyte) flash chip will have 65536 pages: 256*65536 = 16777216 bytes (16MKbytes)
  * This library uses the same function ones as the Moteino SPIFlash and is interned to be used for wireless programming
  * using the Moteino terminology for Anarduino
- * See http://lowpowerlab.com/blog/category/moteino/wireless-programming/ and https://github.com/LowPowerLab/WirelessProgramming 
+ * See http://lowpowerlab.com/blog/category/moteino/wireless-programming/ and https://github.com/LowPowerLab/WirelessProgramming
  * Therefore only a limited set of SPANSION programming functions are implemented to erase, read and write the Flash memory
  *
  * NOTES:
@@ -13,18 +13,18 @@
  *		1. Deep Power mode (Down/Sleep 0xB9 and Release/Wakeup 0xAB) mode is not implemented, the equivalent Moteino SPIFlash functions are therefore programmed as a NOOP
  *		   for compatibility reasons
  *		2. blockErase34K(); (0x52) command is not exactly implemented as for the WINBOND, instead it generates a 8 * blockErase4K() fore compatibility
- *		3. The chipErase(); (0x60) which in the case of the WINBOND is equivalent to a 512K Block erase is simulated by a 8 * blockErase64K(), the actual Chip Erase 
+ *		3. The chipErase(); (0x60) which in the case of the WINBOND is equivalent to a 512K Block erase is simulated by a 8 * blockErase64K(), the actual Chip Erase
  *		   which takes quite a long time (typically 45 seconds for 16 MBytes) is implemented as a new function (bulkErase()) in case of need;
- * 		4. The WINBOND Unique Identifier 8 Bytes value is replaced by a 12 last Bytes of the fisrt 16 Bytes OTP (Manufacturer One Time Program) which is obtained using 
+ * 		4. The WINBOND Unique Identifier 8 Bytes value is replaced by a 12 last Bytes of the fisrt 16 Bytes OTP (Manufacturer One Time Program) which is obtained using
  *		   the readUniqueId () command
  *			Note from the specs:
  *				The OTP 16 lowest address bytes are programmed by Spansion with a 128-bit random number. Only Spansion is able to program these bytes.
  *		5. The JEDEC identifier for the S25FL127S is 0x12018
  *			Note:
  *				1st Byte:  0x01 Manufacturer ID for Spansion
- *				2nd Byte:  0x20 (128 Mb) Device ID Most Significant Byte - Memory Interface Type *				3rd Byte:  0x18 (128 Mb) Device ID Least Significant Byte - Density 
+ *				2nd Byte:  0x20 (128 Mb) Device ID Most Significant Byte - Memory Interface Type *				3rd Byte:  0x18 (128 Mb) Device ID Least Significant Byte - Density
  *		6. A new command printRDID (), is implemented to dump the Manufacturer and Device ID 320Bytes table
- *		7. A new command printStatus(), is implemented to print the status registers 1 and 2 
+ *		7. A new command printStatus(), is implemented to print the status registers 1 and 2
  *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of either the GNU General Public License version 2
@@ -68,7 +68,7 @@
 //#define SPIFLASH_WAKE             0xAB      	// As another meaning for SPANSION than WINBOND deep power wake up
 //#define SPIFLASH_SLEEP            0xB9        // As another meaning for SPANSION than WINBOND deep power down
 #define SPIFLASH_BLOCKERASE_64K   0xD8        // erase one 64K block of flash memory
-                                              
+
 class SPIFlashA {
 public:
   static byte UNIQUEID[12];						// Extended to 12 for SPANSION
@@ -76,24 +76,22 @@ public:
   boolean initialize();
   void command(byte cmd, boolean isWrite=false);
   byte readStatus();
-  void printStatus();
-  void printRDID();
+
   byte readByte(long addr);
   void readBytes(long addr, void* buf, word len);
   void writeByte(long addr, byte byt);
   void writeBytes(long addr, const void* buf, uint16_t len);
   boolean busy();
-  void chipErase();
   void bulkErase();
   void blockErase4K(long address);
   void blockErase32K(long address);
   void blockErase64K(long address);
   void blockErase512K(long address);		// New for SPANSION
   long readDeviceId();
-  byte* readUniqueId();
-  
-  void sleep();
-  void wakeup();
+  byte* readUniqueId(byte uniqueId[12]);
+
+  void circular_log(uint32_t& addr, uint8_t* payload, size_t size);
+
   void end();
 protected:
   void select();

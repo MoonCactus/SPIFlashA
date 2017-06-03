@@ -3,23 +3,23 @@
  * (Typical case when running on a miniWireless platform)
  * Most of the function can be tested by removing the comments delimiters
  * NOTE:  one write constraint is that the bits of the location to write must be set to 1
- *        Therefore the user should insure that any write attempt occurs on a location that is 
+ *        Therefore the user should insure that any write attempt occurs on a location that is
  *        erased (containing 0xFF), typically by staring with a bulkEarse() function.
  *        WARNING: on a 16 MBytes chip this function takes approximately 45s)
 */
-#include <RFM69.h>          //get it here: https://www.github.com/lowpowerlab/rfm69 
-#include <SPI.h>        
-#include <SPIFlashA.h> 
+#include <RFM69.h>          //get it here: https://www.github.com/lowpowerlab/rfm69
+#include <SPI.h>
+#include <SPIFlashB.h> 
 #define FLASH_SS      5     // IMPORTANT: on Anarduino miniWireless the Flash SPI salve select is D5 (vs D8 on Moteino)
 #define NODEID        2     // Unique for each node on same network (
 #define NETWORKID     100   // the same on all nodes that talk to each other
 //Match frequency to the hardware version of the radio on your Moteino (uncomment one):
-#define FREQUENCY     RF69_915MHZ 
+#define FREQUENCY     RF69_915MHZ
 
 byte flashBuffer[90];                // Define a read buffer for readBytes() tests
 byte x = 0;                          // Used to store incremental write pattern (test 9)
 RFM69 radio;                         // Create a dummy RFM69 radio instance
-SPIFlashA flash(FLASH_SS, 0x12018);  // Create a SPANION SPI Flash instance 
+SPIFlashA flash(FLASH_SS, 0x12018);  // Create a SPANION SPI Flash instance
 
 void setup() {
   Serial.begin (115200);
@@ -33,15 +33,15 @@ void setup() {
 void loop() {
 Serial.println ("\r\nLoop");
 
-/* 1. Print the JEDEC ID 
+/* 1. Print the JEDEC ID
    ======================= */
 
 Serial.print("Test 1: Get the JedecID: ");
-Serial.println((long)flash.readDeviceId(), HEX); 
+Serial.println((long)flash.readDeviceId(), HEX);
 
-/* 2. Print the Device Unique ID 
+/* 2. Print the Device Unique ID
    =============================*/
-   
+
 Serial.print("Test 2: Get the Device Unique ID: ");
 flash.readUniqueId ();
 for (int i = 0; i<12; i++)
@@ -52,12 +52,12 @@ for (int i = 0; i<12; i++)
 Serial.println();
 
 
-/* 3. Bulk Erase of the chip 
+/* 3. Bulk Erase of the chip
  *    ====================== */
 /*
 Serial.println ("Test 3: Bulk Erase of the chip - WARNING this may take about 45s");
-Serial.print ("Read address 16777215 (HEX): ");         
-Serial.println (flash.readByte(16777215),HEX);          // Read last location of the Flash Memory         
+Serial.print ("Read address 16777215 (HEX): ");
+Serial.println (flash.readByte(16777215),HEX);          // Read last location of the Flash Memory
 Serial.println ("Write address 16777215 (HEX) AA ");
 flash.writeByte(16777215,0xAA);                         // Write to this location (should work if this location was previously erased)
 Serial.print ("Read address 16777215 (HEX): ");
@@ -70,7 +70,7 @@ flash.bulkErase();                                      // Initiate a the erase
 Serial.print ("Read address 16777215 (HEX): ");
 Serial.println (flash.readByte(16777215),HEX);          // Verify that the location is well erased
 */
-/* 4. 64KBytes Erase  
+/* 4. 64KBytes Erase
  *    ============== */
  /*
 Serial.println ("Test 4: 64KBytes Erase");
@@ -84,11 +84,11 @@ Serial.println ("Erasing 64KBytes: ");
 long start = millis();
 flash.blockErase64K(0);
       while(flash.busy());
-      Serial.print("DONE after (ms): ");Serial.println (millis()-start);   
+      Serial.print("DONE after (ms): ");Serial.println (millis()-start);
 Serial.print ("Read address 65535 (HEX): ");
 Serial.println (flash.readByte(65535),HEX);
 */
-/* 5. 32KBytes Erase  
+/* 5. 32KBytes Erase
  *    ============== */
  /*
 Serial.println ("Test 5: 32KBytes Erase");
@@ -102,11 +102,11 @@ Serial.println ("Erasing 32KBytes: ");
 long start = millis();
 flash.blockErase32K(0);
       while(flash.busy());
-      Serial.print("DONE after (ms): ");Serial.println (millis()-start);  
+      Serial.print("DONE after (ms): ");Serial.println (millis()-start);
 Serial.print ("Read address 32767 (HEX): ");
 Serial.println (flash.readByte(32767),HEX);
 */
-/* 6. 4KBytes Erase  
+/* 6. 4KBytes Erase
  *    ============== */
 /*
 Serial.println ("Test 6: 4KBytes Erase");
@@ -120,12 +120,12 @@ Serial.println ("Erasing 4KBytes: ");
 long start = millis();
 flash.blockErase4K(0);
       while(flash.busy());
-      Serial.print("DONE after (ms): ");Serial.println (millis()-start);  
+      Serial.print("DONE after (ms): ");Serial.println (millis()-start);
 Serial.print ("Read address 4095 (HEX): ");
 Serial.println (flash.readByte(4095),HEX);
 */
 /*
-/* 7. 512KBytes Erase  
+/* 7. 512KBytes Erase
  *    ============== */
  /*
 Serial.println ("Test 7: 512KBytes Erase");
@@ -140,13 +140,13 @@ flash.writeByte(524287,0xEE);
 long start = millis();
 flash.blockErase512K(0);
       while(flash.busy());
-      Serial.print("DONE after (ms): ");Serial.println (millis()-start);  
+      Serial.print("DONE after (ms): ");Serial.println (millis()-start);
 Serial.print ("Read address 524287 (HEX): ");
 Serial.println (flash.readByte(524287),HEX);
 */
-/* 8. Simulate Moteino Chip Erase (512KBytes Erase ) 
+/* 8. Simulate Moteino Chip Erase (512KBytes Erase )
  *    ============================================== */
-/* 
+/*
 Serial.println ("Test 8: Moteino Chip Erase (512KBytes)");
 Serial.print ("Read address 524287 (HEX): ");
 Serial.println (flash.readByte(524287),HEX);
@@ -158,16 +158,16 @@ Serial.println ("Chip Erase (512K): ");
 long start = millis();
 flash.chipErase();
       while(flash.busy());
-      Serial.print("DONE after (ms): ");Serial.println (millis()-start); 
+      Serial.print("DONE after (ms): ");Serial.println (millis()-start);
 Serial.print ("Read address 524287 (HEX): ");
-Serial.println (flash.readByte(524287),HEX); 
+Serial.println (flash.readByte(524287),HEX);
 */
-/* 9. Read Byte test 
+/* 9. Read Byte test
  *    ============== */
 /*
 Serial.println ("Test 9: Read 40 Bytes (Byte per Byte)");
 for (int i = 0; i < 40 ; i++)
-{ 
+{
   byte b =flash.readByte(i);
   if(b<0x10) Serial.print("0");
   Serial.print(b,HEX), Serial.print (" ");
@@ -184,17 +184,17 @@ for (int i = 0; i < 40 ; i++)
 while (flash.busy());
 Serial.println ("Read 40 Bytes (Byte per Byte):");
 for (int i = 0; i < 40 ; i++)
-{ 
+{
   byte b =flash.readByte(i);
   if(b<0x10) Serial.print("0");
   Serial.print(b,HEX), Serial.print (" ");
 }
 Serial.println();
-/* Test 10. Write / Read bulk test 
+/* Test 10. Write / Read bulk test
  * ============================== */
 /*
 Serial.println ("Test 10: Read - Write - Read 44 Bytes into buffer");
-Serial.print ("Read Bulk: "); 
+Serial.print ("Read Bulk: ");
 flash.readBytes (0,flashBuffer,44);
 for (int i = 0; i <44; i++)
 {
@@ -221,7 +221,7 @@ for (int i = 0; i <44; i++)
 }
 Serial.println ();
 */
-/* Test 11. Print Status Registers 
+/* Test 11. Print Status Registers
  * =============================== */
 /*
 Serial.println ("Test 11: Print the Status Registers");
