@@ -31,8 +31,8 @@
  * or the GNU Lesser General Public License version 2.1, both as
  * published by the Free Software Foundation.
  */
-#ifndef _SPIFLASHA_H_
-#define _SPIFLASHA_H_
+#ifndef _SPIFlashB_H_
+#define _SPIFlashB_H_
 
 #if ARDUINO >= 100
 #include <Arduino.h>
@@ -69,35 +69,38 @@
 //#define SPIFLASH_SLEEP            0xB9        // As another meaning for SPANSION than WINBOND deep power down
 #define SPIFLASH_BLOCKERASE_64K   0xD8        // erase one 64K block of flash memory
 
-class SPIFlashA {
+class SPIFlashB
+{
 public:
-  static byte UNIQUEID[12];						// Extended to 12 for SPANSION
-  SPIFlashA(byte slaveSelectPin, uint32_t jedecID=0);
-  boolean initialize();
-  void command(byte cmd, boolean isWrite=false);
-  byte readStatus();
-
-  byte readByte(long addr);
-  void readBytes(long addr, void* buf, word len);
-  void writeByte(long addr, byte byt);
-  void writeBytes(long addr, const void* buf, uint16_t len);
-  boolean busy();
-  void bulkErase();
-  void blockErase4K(long address);
-  void blockErase32K(long address);
-  void blockErase64K(long address);
-  void blockErase512K(long address);		// New for SPANSION
-  long readDeviceId();
-  byte* readUniqueId(byte uniqueId[12]);
-
-  void circular_log(uint32_t& addr, uint8_t* payload, size_t size);
-
-  void end();
+  SPIFlashB(uint8_t slaveSelectPin);
 protected:
   void select();
   void unselect();
+public:
+  bool setup(bool showId);
+  void end();
+
+protected:
+  void command(byte cmd, boolean isWrite=false);
+public:
+  byte readStatus();
+  boolean busy();
+
+  //long readDeviceId(); // 0x12018 for a Spansion S25FL127S
+  byte* readUniqueId(byte uniqueId[12]);
+  byte readByte(long addr);
+  void readBytes(long addr, void* buf, word len);
+
+  void bulkErase();
+  void blockErase4K(long address);
+  void blockErase64K(long address);
+  void writeByte(long addr, byte byt);
+  void writeBytes(long addr, const void* buf, uint16_t len);
+
+  bool circularLog(uint32_t& autoAddr, uint8_t* payload, size_t size, bool preEraseOnConflict);
+
+protected:
   byte _slaveSelectPin;
-  long _jedecID;					// Changed form uint16_t to uint32_t for SPANSION
   byte _SPCR;
   byte _SPSR;
 };

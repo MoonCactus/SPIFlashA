@@ -28,13 +28,11 @@
 
 #include <SPIFlashB.h>
 
-SPIFlashA::SPIFlashA(uint8_t slaveSelectPin, uint32_t jedecID) {
-  _slaveSelectPin = slaveSelectPin;
-  _jedecID = jedecID;
+SPIFlashB::SPIFlashB(uint8_t slaveSelectPin) : _slaveSelectPin(slaveSelectPin) {
 }
 
 /// Select the flash chip
-void SPIFlashA::select() {
+/* protected */ void SPIFlashB::select() {
   noInterrupts();
   //save current SPI settings
   _SPCR = SPCR;					// Required if Multiple SPI are used (typically RFM69)
@@ -48,7 +46,7 @@ void SPIFlashA::select() {
 }
 
 /// UNselect the flash chip
-void SPIFlashA::unselect() {
+/* protected */ void SPIFlashB::unselect() {
   digitalWrite(_slaveSelectPin, HIGH);
   //restore SPI settings to what they were before talking to the FLASH chip
   SPCR = _SPCR;				// Required if Multiple SPI are used (typically RFM69)
@@ -57,7 +55,7 @@ void SPIFlashA::unselect() {
 }
 
 /// setup SPI, read device ID etc...
-boolean SPIFlashA::initialize()
+bool SPIFlashB::setup(bool showId)
 {
   _SPCR = SPCR;				// Required if Multiple SPI are used (typically RFM69)
   _SPSR = SPSR;
@@ -65,71 +63,37 @@ boolean SPIFlashA::initialize()
   unselect();
   while (busy());		// Ensure the memory is ready after power up or restart
 
-  if (_jedecID == 0 || readDeviceId() == _jedecID) {
-    command(SPIFLASH_STATUSWRITE, true); // Write Status Register
-    SPI.transfer(0);                     // Global Unprotect
-    unselect();
-    return true;
+  command(SPIFLASH_STATUSWRITE, true); // Write Status Register
+  SPI.transfer(0);                     // Global Unprotect
+  unselect();
+
+  // Check flash
+  if(showId) Serial.print(F("SpiFlashID="));
+  uint8_t uniqueId[12];
+  readUniqueId(uniqueId);
+  bool empty= true;
+  for(size_t i=0; i<sizeof(uniqueId); i++)
+  {
+    if(showId) Serial.print(uniqueId[i],HEX);
+    if(uniqueId[i]) empty= false;
   }
-  return false;
+  if(showId)
+  {
+    Serial.println();
+    if(empty) Serial.println(F("SPI flash HS"));
+  }
+  return(!empty);
 }
 
-/// Get the manufacturer and device ID bytes (as a long)
-long SPIFlashA::readDeviceId()
-{
-	long jedecid = 0;
-#if defined(__AVR_ATmega32U4__) // Arduino Leonardo, MoteinoLeo
-  command(SPIFLASH_IDREAD); // Read JEDEC ID
-#else
-  select();
-  SPI.transfer(SPIFLASH_IDREAD);
-#endif
-  jedecid |= (long) SPI.transfer(0) <<16;
-  jedecid |= (long) SPI.transfer(0) << 8;
-  jedecid |= (long) SPI.transfer(0);
-  unselect();
-  return jedecid;
+/// cleanup
+void SPIFlashB::end() {
+  SPI.end();
 }
 
-/// Get the 64 bit unique identifier, stores it in provided uniqueId[8] and return a pointer to it
-byte* SPIFlashA::readUniqueId(byte uniqueId[12])
-{
-  command(SPIFLASH_MACREAD);
-  SPI.transfer(0);
-  SPI.transfer(0);
-  SPI.transfer(0);
-  SPI.transfer(0);
-  for (byte i=0;i<12;i++)				// Change from 8 to 12 for SPANSION
-    uniqueId[i] = SPI.transfer(0);
-  unselect();
-  return uniqueId;
-}
-
-/// read 1 byte from flash memory
-byte SPIFlashA::readByte(long addr) {
-  command(SPIFLASH_ARRAYREADLOWFREQ);
-  SPI.transfer(addr >> 16);
-  SPI.transfer(addr >> 8);
-  SPI.transfer(addr);
-  byte result = SPI.transfer(0);
-  unselect();
-  return result;
-}
-
-/// read unlimited # of bytes
-void SPIFlashA::readBytes(long addr, void* buf, word len) {
-  command(SPIFLASH_ARRAYREAD);
-  SPI.transfer(addr >> 16);
-  SPI.transfer(addr >> 8);
-  SPI.transfer(addr);
-  SPI.transfer(0); //"dont care"
-  for (word i = 0; i < len; ++i)
-    ((byte*) buf)[i] = SPI.transfer(0);
-  unselect();
-}
+// ============================================================================= LOW LEVEL
 
 /// Send a command to the flash chip, pass TRUE for isWrite when its a write command
-void SPIFlashA::command(byte cmd, boolean isWrite){
+/* protected */ void SPIFlashB::command(byte cmd, boolean isWrite){
 #if defined(__AVR_ATmega32U4__) // Arduino Leonardo, MoteinoLeo
   DDRB |= B00000001;            // Make sure the SS pin (PB0 - used by RFM12B on MoteinoLeo R1) is set as output HIGH!
   PORTB |= B00000001;
@@ -149,14 +113,8 @@ void SPIFlashA::command(byte cmd, boolean isWrite){
   SPI.transfer(cmd);
 }
 
-/// check if the chip is busy erasing/writing
-boolean SPIFlashA::busy()
-{
-  return readStatus() & 1;
-}
-
 /// return the STATUS register
-byte SPIFlashA::readStatus()
+byte SPIFlashB::readStatus()
 {
   select();
   SPI.transfer(SPIFLASH_STATUSREAD);
@@ -165,11 +123,107 @@ byte SPIFlashA::readStatus()
   return status;
 }
 
+/// check if the chip is busy erasing/writing
+boolean SPIFlashB::busy()
+{
+  return readStatus() & 1;
+}
+
+// ============================================================================= READ IDS
+
+/// Get the manufacturer and device ID bytes (as a long)
+/*
+long SPIFlashB::readDeviceId()
+{
+	long jedecid = 0;
+#if defined(__AVR_ATmega32U4__) // Arduino Leonardo, MoteinoLeo
+  command(SPIFLASH_IDREAD); // Read JEDEC ID
+#else
+  select();
+  SPI.transfer(SPIFLASH_IDREAD);
+#endif
+  jedecid |= (long) SPI.transfer(0) <<16;
+  jedecid |= (long) SPI.transfer(0) << 8;
+  jedecid |= (long) SPI.transfer(0);
+  unselect();
+  return jedecid;
+}
+*/
+
+/// Get the 64 bit unique identifier, stores it in provided uniqueId[8] and return a pointer to it
+byte* SPIFlashB::readUniqueId(byte uniqueId[12])
+{
+  command(SPIFLASH_MACREAD);
+  SPI.transfer(0);
+  SPI.transfer(0);
+  SPI.transfer(0);
+  SPI.transfer(0);
+  for (byte i=0;i<12;i++)				// Change from 8 to 12 for SPANSION
+    uniqueId[i] = SPI.transfer(0);
+  unselect();
+  return uniqueId;
+}
+
+// ============================================================================= READ
+
+/// read 1 byte from flash memory
+byte SPIFlashB::readByte(long addr) {
+  command(SPIFLASH_ARRAYREADLOWFREQ);
+  SPI.transfer(addr >> 16);
+  SPI.transfer(addr >> 8);
+  SPI.transfer(addr);
+  byte result = SPI.transfer(0);
+  unselect();
+  return result;
+}
+
+/// read unlimited # of bytes
+void SPIFlashB::readBytes(long addr, void* buf, word len) {
+  command(SPIFLASH_ARRAYREAD);
+  SPI.transfer(addr >> 16);
+  SPI.transfer(addr >> 8);
+  SPI.transfer(addr);
+  SPI.transfer(0); //"dont care"
+  for (word i = 0; i < len; ++i)
+    ((byte*) buf)[i] = SPI.transfer(0);
+  unselect();
+}
+
+// ============================================================================= WRITE
+
+/// erase entire flash memory array
+/// may take several seconds depending on size, but is non blocking
+/// so you may wait for this to complete using busy() or continue doing
+/// other things and later check if the chip is done with busy()
+/// note that any command will first wait for chip to become available using busy()
+/// so no need to do that twice
+void SPIFlashB::bulkErase() {
+  command(SPIFLASH_CHIPERASE, true);
+  unselect();
+}
+
+/// erase a 4Kbyte block
+void SPIFlashB::blockErase4K(long addr) {
+  command(SPIFLASH_BLOCKERASE_4K, true); // Block Erase
+  SPI.transfer(addr >> 16);
+  SPI.transfer(addr >> 8);
+  SPI.transfer(addr);
+  unselect();
+}
+
+/// erase a 64Kbyte block
+void SPIFlashB::blockErase64K(long addr) {
+  command(SPIFLASH_BLOCKERASE_64K, true); // Block Erase
+  SPI.transfer(addr >> 16);
+  SPI.transfer(addr >> 8);
+  SPI.transfer(addr);
+  unselect();
+}
 
 /// Write 1 byte to flash memory
 /// WARNING: you can only write to previously erased memory locations (see datasheet)
 ///          use the block erase commands to first clear memory (write 0xFFs)
-void SPIFlashA::writeByte(long addr, uint8_t byt) {
+void SPIFlashB::writeByte(long addr, uint8_t byt) {
   command(SPIFLASH_BYTEPAGEPROGRAM, true);  // Byte/Page Program
   SPI.transfer(addr >> 16);
   SPI.transfer(addr >> 8);
@@ -184,7 +238,7 @@ void SPIFlashA::writeByte(long addr, uint8_t byt) {
 /// WARNING: if you write beyond a page boundary (or more than 256bytes),
 ///          the bytes will wrap around and start overwriting at the beginning of that same page
 ///          see datasheet for more details
-void SPIFlashA::writeBytes(long addr, const void* buf, uint16_t len) {
+void SPIFlashB::writeBytes(long addr, const void* buf, uint16_t len) {
   command(SPIFLASH_BYTEPAGEPROGRAM, true);  // Byte/Page Program
   SPI.transfer(addr >> 16);
   SPI.transfer(addr >> 8);
@@ -194,67 +248,33 @@ void SPIFlashA::writeBytes(long addr, const void* buf, uint16_t len) {
   unselect();
 }
 
-/// erase entire flash memory array
-/// may take several seconds depending on size, but is non blocking
-/// so you may wait for this to complete using busy() or continue doing
-/// other things and later check if the chip is done with busy()
-/// note that any command will first wait for chip to become available using busy()
-/// so no need to do that twice
-void SPIFlashA::bulkErase() {
-  command(SPIFLASH_CHIPERASE, true);
-  unselect();
-}
-
-/// erase a 4Kbyte block
-void SPIFlashA::blockErase4K(long addr) {
-  command(SPIFLASH_BLOCKERASE_4K, true); // Block Erase
-  SPI.transfer(addr >> 16);
-  SPI.transfer(addr >> 8);
-  SPI.transfer(addr);
-  unselect();
-}
-
-/// erase a 64Kbyte block
-void SPIFlashA::blockErase64K(long addr) {
-  command(SPIFLASH_BLOCKERASE_64K, true); // Block Erase
-  SPI.transfer(addr >> 16);
-  SPI.transfer(addr >> 8);
-  SPI.transfer(addr);
-  unselect();
-}
-
-void SPIFlashA::circular_log(uint32_t& addr, uint8_t* payload, size_t size)
+bool SPIFlashB::circularLog(uint32_t& autoAddr, uint8_t* payload, size_t size, bool preEraseOnConflict)
 {
   // TODO: use faster FIFO writeBytes(addr,payload,length), but check block boundaries else wrap around will occur!
-  // Writing uses 50mA, see http://www.cypress.com/file/177961/download
-  /*
-    10.5.1.1 Page Programming
-    Page Programming is done by loading a Page Buffer with data to be programmed and issuing a programming
-    command to move data from the buffer to the memory array. This sets an upper limit on the amount of data
-    that can be programmed with a single programming command. Page Programming allows up to a page size
-    (either 256 or 512 bytes) to be programmed in one operation. The page size is determined by a configuration
-    bit (SR2[6]). The page is aligned on the page size address boundary. It is possible to program from one bit up
-    to a page size in each Page programming operation. It is recommended that a multiple of 16-byte length and
-    aligned Program Blocks be written. For the very best performance, programming should be done in full,
-    aligned, pages of 512 bytes aligned on 512-byte boundaries with each Page being programmed only once.
-  */
+  // Writing uses 50mA, see http://www.cypress.com/file/177961/download and see 10.5.1.1 Page Programming perfs.
   for(size_t n=0; n<size; ++n)
   {
-    if((addr & 0xFFF) == 0) // entering a new 4KB sector? then we need to erase it first
+    if((autoAddr & 0xFFF) == 0) // entering a new 4KB sector? then we need to erase it first
     {
-      blockErase4K(addr / 0x1000);
+      Serial.println(F("SpiLog:newBlock"));
+      blockErase4K(autoAddr);
       while(busy());
     }
-    writeByte(addr, payload[n]);
+    else if(readByte(autoAddr)!=0xFF) // secondary safety
+    {
+      Serial.println(F("SpiLog:tainted"));
+      if(!preEraseOnConflict)
+      {
+        return false;
+      }
+      blockErase4K(autoAddr & ~0xFFF);
+      while(busy());
+    }
+    writeByte(autoAddr, payload[n]);
     while(busy());
-    ++addr;
-    if(addr==0x1000000) // 16MByte wrap around
-      addr= 0;
+    ++autoAddr;
+    if(autoAddr==0x1000000) // 16MByte wrap around
+      autoAddr= 0;
   }
-  while(busy());
-}
-
-/// cleanup
-void SPIFlashA::end() {
-  SPI.end();
+  return true;
 }

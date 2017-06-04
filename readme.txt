@@ -1,7 +1,7 @@
 SPIFlashB (SPIFlash for Anarduino)
 =========
 
-This derivative is based on SPIFLashA from https://github.com/rrobinet/SPIFlashA
+This derivative is based on SPIFlashB from https://github.com/rrobinet/SPIFlashB
 I only reduced it and removed some Serial.print in order to spare memory, and added a few features, like a "circular write" for IoT logging devices. The thing is not extremely efficient though (byte streams), and I may optimize it one day.
 
 **Original readme.md follows**

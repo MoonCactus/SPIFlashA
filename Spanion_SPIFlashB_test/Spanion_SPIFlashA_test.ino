@@ -1,4 +1,4 @@
-/* Sample SPIFlashA for Anarduino miniWireless test script f.
+/* Sample SPIFlashB for Anarduino miniWireless test script f.
  * For compatibility purposes with multiple SPI devices it is associated to a RFM69 transceiver
  * (Typical case when running on a miniWireless platform)
  * Most of the function can be tested by removing the comments delimiters
@@ -19,7 +19,7 @@
 byte flashBuffer[90];                // Define a read buffer for readBytes() tests
 byte x = 0;                          // Used to store incremental write pattern (test 9)
 RFM69 radio;                         // Create a dummy RFM69 radio instance
-SPIFlashA flash(FLASH_SS, 0x12018);  // Create a SPANION SPI Flash instance
+SPIFlashB flash(FLASH_SS, 0x12018);  // Create a SPANION SPI Flash instance
 
 void setup() {
   Serial.begin (115200);

@@ -1,4 +1,4 @@
-SPIFlashA	KEYWORD1
+SPIFlashB	KEYWORD1
 initialize	KEYWORD2
 command		KEYWORD2
 readStatus	KEYWORD2
