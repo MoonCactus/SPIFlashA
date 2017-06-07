@@ -32,7 +32,8 @@ SPIFlashB::SPIFlashB(uint8_t slaveSelectPin) : _slaveSelectPin(slaveSelectPin) {
 }
 
 /// Select the flash chip
-/* protected */ void SPIFlashB::select() {
+void SPIFlashB::select() // protected
+{
   noInterrupts();
   //save current SPI settings
   _SPCR = SPCR;					// Required if Multiple SPI are used (typically RFM69)
@@ -46,7 +47,8 @@ SPIFlashB::SPIFlashB(uint8_t slaveSelectPin) : _slaveSelectPin(slaveSelectPin) {
 }
 
 /// UNselect the flash chip
-/* protected */ void SPIFlashB::unselect() {
+void SPIFlashB::unselect()  // protected
+{
   digitalWrite(_slaveSelectPin, HIGH);
   //restore SPI settings to what they were before talking to the FLASH chip
   SPCR = _SPCR;				// Required if Multiple SPI are used (typically RFM69)
@@ -57,11 +59,14 @@ SPIFlashB::SPIFlashB(uint8_t slaveSelectPin) : _slaveSelectPin(slaveSelectPin) {
 /// setup SPI, read device ID etc...
 bool SPIFlashB::setup(bool showId)
 {
+  pinMode(_slaveSelectPin, OUTPUT);
+  SPI.begin();
+
   _SPCR = SPCR;				// Required if Multiple SPI are used (typically RFM69)
   _SPSR = SPSR;
   pinMode(_slaveSelectPin, OUTPUT);
   unselect();
-  while (busy());		// Ensure the memory is ready after power up or restart
+  while(busy());		// Ensure the memory is ready after power up or restart
 
   command(SPIFLASH_STATUSWRITE, true); // Write Status Register
   SPI.transfer(0);                     // Global Unprotect
@@ -151,17 +156,22 @@ long SPIFlashB::readDeviceId()
 */
 
 /// Get the 64 bit unique identifier, stores it in provided uniqueId[8] and return a pointer to it
-byte* SPIFlashB::readUniqueId(byte uniqueId[12])
+byte SPIFlashB::readUniqueId(byte uniqueId[12])
 {
   command(SPIFLASH_MACREAD);
   SPI.transfer(0);
   SPI.transfer(0);
   SPI.transfer(0);
   SPI.transfer(0);
+  byte ck= 0;
   for (byte i=0;i<12;i++)				// Change from 8 to 12 for SPANSION
-    uniqueId[i] = SPI.transfer(0);
+  {
+    byte b= SPI.transfer(0);
+    if(uniqueId) uniqueId[i]= b;
+    ck=(ck ^ b);
+  }
   unselect();
-  return uniqueId;
+  return ck;
 }
 
 // ============================================================================= READ
@@ -248,6 +258,11 @@ void SPIFlashB::writeBytes(long addr, const void* buf, uint16_t len) {
   unselect();
 }
 
+uint32_t SPIFlashB::circularWidth(uint32_t begin, uint32_t end)
+{
+  return (end>=begin) ? end-begin : SPI_FLASH_SIZE - (begin-end);
+}
+
 bool SPIFlashB::circularLog(uint32_t& autoAddr, uint8_t* payload, size_t size, bool preEraseOnConflict)
 {
   // TODO: use faster FIFO writeBytes(addr,payload,length), but check block boundaries else wrap around will occur!
@@ -273,7 +288,7 @@ bool SPIFlashB::circularLog(uint32_t& autoAddr, uint8_t* payload, size_t size, b
     writeByte(autoAddr, payload[n]);
     while(busy());
     ++autoAddr;
-    if(autoAddr==0x1000000) // 16MByte wrap around
+    if(autoAddr==SPI_FLASH_SIZE) // 16MByte wrap around
       autoAddr= 0;
   }
   return true;

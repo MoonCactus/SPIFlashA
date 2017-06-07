@@ -41,6 +41,12 @@
 #include "pins_arduino.h"
 #endif
 
+#ifndef SPI_FLASH_SIZE
+  // TODO: use the data provided by the actual chip!
+  #define SPI_FLASH_SIZE (0x1000000L)
+#endif
+
+
 #include <SPI.h>
 
 /// IMPORTANT: NAND FLASH memory requires erase before write, because
@@ -87,7 +93,7 @@ public:
   boolean busy();
 
   //long readDeviceId(); // 0x12018 for a Spansion S25FL127S
-  byte* readUniqueId(byte uniqueId[12]);
+  byte readUniqueId(byte uniqueId[12]); // returns a 1-byte pseudo id (high collision rate is probable)
   byte readByte(long addr);
   void readBytes(long addr, void* buf, word len);
 
@@ -97,6 +103,7 @@ public:
   void writeByte(long addr, byte byt);
   void writeBytes(long addr, const void* buf, uint16_t len);
 
+  uint32_t circularWidth(uint32_t begin, uint32_t end);
   bool circularLog(uint32_t& autoAddr, uint8_t* payload, size_t size, bool preEraseOnConflict);
 
 protected:
